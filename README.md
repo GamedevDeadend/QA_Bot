@@ -152,7 +152,7 @@ Unlike cloud-based solutions (ChatGPT, Claude, Gemini), this app runs **100% on 
 
 **Tanmay Agrawal**
 - GitHub: [@GamedevDeadend](https://github.com/GamedevDeadend)
-- LinkedIn: [Tanmay Agrawal](https://linkedin.com/in/tanmay-agrawal)
+- LinkedIn: [Tanmay Agrawal](https://www.linkedin.com/in/tanmay-agrawal-2954361a0)
 
 ---
 
