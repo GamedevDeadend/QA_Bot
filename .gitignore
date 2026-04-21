@@ -206,3 +206,4 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 Question_Answer_Bot/.gradio
+.gradio
