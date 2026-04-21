@@ -68,8 +68,8 @@ Gradio UI → displays answer
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/GamedevDeadend/pdf-qa-bot.git
-cd pdf-qa-bot
+git clone https://github.com/GamedevDeadend/QA_Bot.git
+cd QA_Bot
 ```
 
 ### 2. Install dependencies
