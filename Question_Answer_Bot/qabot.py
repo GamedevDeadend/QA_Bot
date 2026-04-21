@@ -35,7 +35,7 @@ def text_splitter(data):
 
 def embeddings():
     embedding = OllamaEmbeddings(
-        model="qwen2.5:3b"
+        model="nomic-embed-text"
     )
     return embedding
 
