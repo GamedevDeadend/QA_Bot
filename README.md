@@ -1,5 +1,10 @@
 # 🤖 RAG QA Bot — Chat with your PDF locally
 
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
+![LangChain](https://img.shields.io/badge/LangChain-latest-green)
+![Ollama](https://img.shields.io/badge/Ollama-local-orange)
+![License](https://img.shields.io/badge/License-Apache%202.0-blue)
+
 A privacy-first conversational AI chatbot that lets you upload any PDF and have a full conversation about it. Powered by a fully local RAG (Retrieval-Augmented Generation) pipeline — **no API keys, no internet, no data leaves your machine.**
 
 ---
@@ -14,31 +19,17 @@ A privacy-first conversational AI chatbot that lets you upload any PDF and have 
 
 ## ✨ Features
 
-- 📄 Upload any PDF document
-- 🔍 Intelligent semantic search using vector embeddings
-- 🧠 Fully local LLM inference via Ollama — complete privacy
-- 💬 Conversational memory — bot remembers context across messages
-- 🔄 Smart question condensing — follow-up questions work naturally
-- 🌐 DuckDuckGo web search fallback — searches web when PDF has no answer
-- 🎭 Three personality modes — Formal, Friendly, Flirtatious
-- 🔍 Force web search option — manually trigger web search anytime
-- ⚡ Retriever caching — fast responses after first question
-- 🖥️ Clean chat UI powered by Gradio
-- 🔑 No API keys required
-
----
-
-## 🛠️ Tech Stack
-
-| Tool | Purpose |
-|------|---------|
-| [Ollama](https://ollama.com) | Local LLM inference (Qwen 2.5 3B) |
-| [LangChain](https://langchain.com) | RAG pipeline orchestration |
-| [ChromaDB](https://trychroma.com) | Vector database for embeddings |
-| [nomic-embed-text](https://ollama.com/library/nomic-embed-text) | Local embedding model |
-| [PyMuPDF](https://pymupdf.readthedocs.io) | Fast PDF document loading |
-| [DuckDuckGo Search](https://pypi.org/project/duckduckgo-search) | Web search fallback |
-| [Gradio](https://gradio.app) | Chat web UI |
+| Feature | Description |
+|---------|-------------|
+| 📄 **PDF Upload** | Upload any PDF document and start chatting instantly |
+| 🧠 **Local LLM** | Fully local inference via Ollama — zero data sent to cloud |
+| 💬 **Conversational Memory** | Bot remembers context across the entire conversation |
+| 🔄 **Smart Question Condensing** | Follow-up questions resolve correctly against prior context |
+| 🔍 **Force Web Search** | Manual toggle to search the web anytime |
+| 🎭 **3 Personality Modes** | Switch between Formal, Friendly, and Flirtatious response styles |
+| ⚡ **Retriever Caching** | Embeddings cached after first load — fast follow-up responses |
+| 🖥️ **Clean Chat UI** | Gradio Blocks chat interface with full message history |
+| 🔑 **No API Keys** | 100% free to run — no subscriptions, no limits |
 
 ---
 
@@ -46,39 +37,54 @@ A privacy-first conversational AI chatbot that lets you upload any PDF and have 
 
 ```
 PDF Upload
-    ↓
-PyMuPDFLoader → loads document pages (faster than PyPDF)
-    ↓
-RecursiveCharacterTextSplitter → chunks text (700 chars, 140 overlap)
-    ↓
-nomic-embed-text → generates embeddings locally
-    ↓
-ChromaDB → stores and indexes embeddings
-    ↓
-Retriever Cache → skips re-processing on follow-up questions
-    ↓
-User Query → Question Condensing (resolves follow-up context)
-    ↓
-Semantic Search → top relevant chunks retrieved
-    ↓
-Personality Prompt → shapes LLM tone and style
-    ↓
-Qwen 2.5 3B (via Ollama) → generates answer from context
-    ↓
-Answer Useful? → No → DuckDuckGo Web Search fallback
-    ↓
-Gradio Chat UI → displays answer with full history
+    │
+    ▼
+PyMuPDFLoader          ← Fast PDF parsing (PyMuPDF)
+    │
+    ▼
+RecursiveCharacterTextSplitter   ← 500 char chunks, 50 overlap
+    │
+    ▼
+nomic-embed-text (Ollama)        ← Local embedding model
+    │
+    ▼
+ChromaDB                         ← Vector store (in-memory)
+    │
+    ├── Retriever Cache          ← Skips re-embedding on follow-ups
+    │
+    ▼
+User Query
+    │
+    ├── Smart Condensing         ← Rewrites follow-up questions with context
+    │
+    ▼
+Semantic Search → Top K Chunks Retrieved
+    │
+    │
+    ▼
+Qwen 2.5 3B (Ollama)            ← Local LLM, temperature 0.7
+    │
+    ├── Personality System Prompt (Formal / Friendly / Flirtatious)
+    │
+    ├── Manual Web Search Toggle → DuckDuckGo Search Tool
+    ▼
+Gradio Chat UI                   ← Response displayed with history
 ```
 
 ---
 
-## 🎭 Personality Modes
+## 🛠️ Tech Stack
 
-| Personality | Description |
-|-------------|-------------|
-| **Formal** | Professional, precise, authoritative tone |
-| **Friendly** | Warm, casual, encouraging — like talking to a friend |
-| **Flirtatious** | Playful, witty, charming with light humor |
+| Tool | Version | Purpose |
+|------|---------|---------|
+| [Ollama](https://ollama.com) | Latest | Local LLM inference |
+| [Qwen 2.5 3B](https://ollama.com/library/qwen2.5) | 3B | Language model |
+| [nomic-embed-text](https://ollama.com/library/nomic-embed-text) | Latest | Local embeddings |
+| [LangChain](https://langchain.com) | 0.4.x | RAG pipeline orchestration |
+| [ChromaDB](https://trychroma.com) | Latest | Vector database |
+| [PyMuPDF](https://pymupdf.readthedocs.io) | Latest | Fast PDF loading |
+| [DuckDuckGo Search](https://pypi.org/project/duckduckgo-search/) | Latest | Web search fallback |
+| [Gradio](https://gradio.app) | 6.13.0 | Chat UI |
 
 ---
 
@@ -102,7 +108,7 @@ cd QA_Bot
 pip install -r requirements.txt
 ```
 
-### 3. Pull required Ollama models
+### 3. Pull the required Ollama models
 
 ```bash
 ollama pull qwen2.5:3b
@@ -119,20 +125,32 @@ Open your browser at `http://127.0.0.1:7860`
 
 ---
 
-## 📦 Requirements
+## 🎭 Personality Modes
 
-```
-langchain
-langchain-ollama
-langchain-community
-langchain-text-splitters
-langchain-core
-chromadb
-gradio
-pymupdf
-duckduckgo-search
-ddgs
-```
+The bot has three distinct response personalities — switch between them anytime from the UI:
+
+| Mode | Description |
+|------|-------------|
+| **Formal** | Professional, precise, structured responses |
+| **Friendly** | Conversational, warm, encouraging tone |
+| **Flirtatious** | Playful, witty, charming — with accurate answers |
+
+---
+
+## 💡 How It Works
+
+This project uses **RAG (Retrieval-Augmented Generation)** — a technique where, instead of relying purely on the LLM's training data, we:
+
+1. **Ingest** — Load and parse the PDF using PyMuPDF
+2. **Chunk** — Split into 500-character overlapping segments
+3. **Embed** — Convert chunks to vectors using `nomic-embed-text` locally
+4. **Store** — Index vectors in ChromaDB for fast similarity search
+5. **Query** — On each question, retrieve the most relevant chunks
+6. **Condense** — Rewrite follow-up questions to be self-contained (handles "what about that?" correctly)
+7. **Generate** — Feed retrieved context + personality prompt to Qwen 2.5 3B
+8. **Web Search** — Optionally trigger DuckDuckGo search via the UI toggle to supplement answers with live web results
+
+The bot answers from **your document**, not from general knowledge.
 
 ---
 
@@ -141,50 +159,36 @@ ddgs
 ```
 QA_Bot/
 │
-├── Question_Answer_Bot/
-│   ├── qabot.py           # Main application
-│   └── requirements.txt   # Python dependencies
-├── README.md              # You are here
-├── LICENSE                # Apache 2.0
+├── qabot.py            # Main application — RAG pipeline + Gradio UI
+├── requirements.txt    # Pinned Python dependencies
+├── LICENSE             # Apache 2.0
+├── README.md           # You are here
 └── assets/
-    └── demo.png           # Demo screenshot
+    └── demo.png        # Demo screenshot
 ```
 
 ---
 
-## 💡 How It Works
+## 🔮 Future Improvements
 
-This project uses **RAG (Retrieval-Augmented Generation)** — a technique where instead of relying purely on the LLM's training data, we:
-
-1. Break the PDF into small chunks
-2. Convert chunks into vector embeddings using `nomic-embed-text`
-3. Store them in ChromaDB vector database
-4. When you ask a question, condense it using chat history for context
-5. Find the most relevant chunks via semantic search
-6. Feed chunks + personality prompt + question to the LLM
-7. If answer isn't useful → automatically search DuckDuckGo
-8. Return answer with full conversation history
-
----
-
-## 🔒 Privacy First
-
-Unlike cloud-based solutions (ChatGPT, Claude, Gemini), this app runs **100% on your local machine**:
-- No data sent to any server
-- No API keys needed
-- Works completely offline after setup
-- Your documents stay completely private
-
----
-
-## 👤 Author
-
-**Tanmay Agrawal**
-- GitHub: [@GamedevDeadend](https://github.com/GamedevDeadend)
-- LinkedIn: [Tanmay Agrawal](https://www.linkedin.com/in/tanmay-agrawal-2954361a0)
+- [ ] **FastAPI endpoint** — expose `/ask` API for external integrations
+- [ ] **Multi-PDF support** — chat across multiple documents simultaneously
+- [ ] **Persistent ChromaDB** — save and reload vector stores between sessions
+- [ ] **Cloud LLM option** — toggle between Ollama (local) and OpenAI/Groq (cloud)
+- [ ] **Streaming responses** — token-by-token output for faster perceived speed
+- [ ] **Source citations** — show which PDF page each answer came from
+- [ ] **Docker deployment** — containerized setup for one-command install
 
 ---
 
 ## 📄 License
 
-[Apache 2.0](LICENSE) — feel free to use and modify.
+This project is licensed under the [Apache License 2.0](LICENSE) — free to use, modify, and distribute.
+
+---
+
+## 🙋 Author
+
+**Tanmay Agrawal** — Game Developer turned AI Engineer
+- GitHub: [@GamedevDeadend](https://github.com/GamedevDeadend)
+- LinkedIn: [Tanmay Agrawal](https://linkedin.com/in/tanmay-agrawal)
