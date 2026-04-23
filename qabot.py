@@ -64,8 +64,8 @@ def document_loader(file):
 
 def text_splitter(data):
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=700,
-        chunk_overlap=140,
+        chunk_size=500,
+        chunk_overlap=50,
         length_function=len,
     )
     chunks = splitter.split_documents(data)
@@ -91,7 +91,7 @@ def retriever(file):
     splits = document_loader(file)
     chunks = text_splitter(splits)
     vectordb = vector_database(chunks)
-    retriever_cache[file] = vectordb.as_retriever()
+    retriever_cache[file] = vectordb.as_retriever(search_kwargs={"k": 3})
 
     return retriever_cache[file]
 
@@ -164,20 +164,45 @@ def retriever_qa(file, query, chat_history, use_search, personality):
     else:
         prompt = ChatPromptTemplate.from_messages([
             ("system", personality_Tunning_Prompt),
-            ("human", f"{input}")
+            ("human", "{input}")
         ])
 
         chain = prompt | llm
         answer = chain.invoke({"input": condensed_query})
         if hasattr(answer, "content"):
             answer = answer.content
+    
 
     if use_search:
         search_result = search_tool.run(condensed_query)
-        answer = f"{answer}\n\nAdditional Search Result: {search_result}"
 
+        refine_prompt = f"""{personality_Tunning_Prompt}
 
+You are given an answer and additional web information.
 
+Original Answer:
+{answer}
+
+Web Information:
+{search_result}
+
+Task:
+- Improve the answer using the web information if relevant
+- Keep it concise and original in tone based on the selected personality
+- Do NOT mention "web information" explicitly
+- If web info is irrelevant, ignore it
+
+Final Answer:
+"""
+
+        refined = llm.invoke(refine_prompt)
+
+        if hasattr(refined, "content"):
+            answer = refined.content.strip()
+        else:
+            answer = str(refined).strip()
+
+    
     chat_history.append({"role": "user", "content": query})
     chat_history.append({"role": "assistant", "content": answer})
 
