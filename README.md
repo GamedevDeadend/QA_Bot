@@ -76,9 +76,9 @@ Gradio Chat UI → displays answer with full history
 
 | Personality | Description |
 |-------------|-------------|
-| **Formal Girl** | Professional, precise, authoritative tone |
-| **Friendly Girl** | Warm, casual, encouraging — like talking to a friend |
-| **Flirtatious Girl** | Playful, witty, charming with light humor |
+| **Formal** | Professional, precise, authoritative tone |
+| **Friendly** | Warm, casual, encouraging — like talking to a friend |
+| **Flirtatious** | Playful, witty, charming with light humor |
 
 ---
 
