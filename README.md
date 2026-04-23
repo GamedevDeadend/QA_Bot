@@ -191,4 +191,4 @@ This project is licensed under the [Apache License 2.0](LICENSE) — free to use
 
 **Tanmay Agrawal** — Game Developer turned AI Engineer
 - GitHub: [@GamedevDeadend](https://github.com/GamedevDeadend)
-- LinkedIn: [Tanmay Agrawal](https://linkedin.com/in/tanmay-agrawal)
+- LinkedIn: [Tanmay Agrawal](https://www.linkedin.com/in/tanmay-agrawal-2954361a0/)
