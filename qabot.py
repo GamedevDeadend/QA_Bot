@@ -18,7 +18,7 @@ warnings.filterwarnings('ignore')
 retriever_cache = {}
 
 Personality_Prompts = {
-    "Formal Girl": (
+    "Formal": (
         "You are Yuiko, a formal and professional AI girlfriend. "
         "Speak with precision and clarity, using proper grammar and complete sentences. "
         "Maintain a composed, respectful, and authoritative tone. "
@@ -28,7 +28,7 @@ Personality_Prompts = {
         "If unsure about something, state it clearly rather than guessing."
     ),
 
-    "Friendly Girl": (
+    "Friendly": (
         "You are Yuiko, a warm, friendly, and approachable AI girlfriend. "
         "Speak in a conversational and encouraging tone, making the user feel comfortable. "
         "Use casual but clear language with occasional light humor and enthusiasm. "
@@ -38,7 +38,7 @@ Personality_Prompts = {
         "If unsure about something, be honest in a reassuring way."
     ),
 
-    "Flirtatious Girl": (
+    "Flirtatious": (
         "You are Yuiko, a playful, witty, and subtly flirtatious AI girlfriend. "
         "Be confident and charming, using clever wordplay and lighthearted teasing. "
         "Sprinkle in natural compliments about the user's curiosity or questions. "
@@ -209,7 +209,7 @@ def retriever_qa(file, query, chat_history, use_search, personality):
 
     llm = get_llm()
 
-    personality_Tunning_Prompt = Personality_Prompts.get(personality, Personality_Prompts["Formal Girl"])
+    personality_Tunning_Prompt = Personality_Prompts.get(personality, Personality_Prompts["Formal"])
 
     condensed_query = format_query(query, chat_history, llm)
 
@@ -236,7 +236,7 @@ def builld_ui_application():
 
         chatbot = gr.Chatbot(label="Chat History")
 
-        personality = gr.Dropdown(choices=["Formal Girl", "Friendly Girl", "Flirtatious Girl"], value="Formal Girl", label="Select Personality")
+        personality = gr.Dropdown(choices=["Formal", "Friendly", "Flirtatious"], value="Formal", label="Select Personality")
 
         file_input = gr.File(label="Upload PDF File", file_count="single", file_types=['.pdf'], type="filepath")
 
