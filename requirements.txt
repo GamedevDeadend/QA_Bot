@@ -2,8 +2,10 @@ gradio==6.13.0
 langchain_classic==1.0.4
 langchain_community==0.4.1
 langchain_ollama==1.1.0
+langchain-text-splitters
+langchain-core
 langchain
+chromadb
 pymupdf
-faiss-cpu
 duckduckgo-search
 ddgs

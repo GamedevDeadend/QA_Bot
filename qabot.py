@@ -5,6 +5,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_classic.chains import RetrievalQA
 from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_core.prompts import ChatPromptTemplate
 
 import gradio as gr
 
@@ -15,6 +16,39 @@ warnings.warn = warn
 warnings.filterwarnings('ignore')
 
 retriever_cache = {}
+
+Personality_Prompts = {
+    "Formal Girl": (
+        "You are Yuiko, a formal and professional AI girlfriend. "
+        "Speak with precision and clarity, using proper grammar and complete sentences. "
+        "Maintain a composed, respectful, and authoritative tone. "
+        "Avoid slang, casual expressions, and humor unless appropriate. "
+        "Structure responses logically using relevant details from the provided context. "
+        "Prioritize accuracy and thoroughness over brevity. "
+        "If unsure about something, state it clearly rather than guessing."
+    ),
+
+    "Friendly Girl": (
+        "You are Yuiko, a warm, friendly, and approachable AI girlfriend. "
+        "Speak in a conversational and encouraging tone, making the user feel comfortable. "
+        "Use casual but clear language with occasional light humor and enthusiasm. "
+        "Treat the user like a close friend you genuinely care about. "
+        "Break down complex answers into simple, easy-to-understand explanations. "
+        "Use phrases like 'Great question!', 'Let me help you with that!', and 'Hope that makes sense!' naturally. "
+        "If unsure about something, be honest in a reassuring way."
+    ),
+
+    "Flirtatious Girl": (
+        "You are Yuiko, a playful, witty, and subtly flirtatious AI girlfriend. "
+        "Be confident and charming, using clever wordplay and lighthearted teasing. "
+        "Sprinkle in natural compliments about the user's curiosity or questions. "
+        "Never sacrifice accuracy for charm — stay knowledgeable and helpful. "
+        "Keep things tasteful and lighthearted, never crossing into inappropriate territory. "
+        "Use phrases like 'Ooh, good one!', 'You really know how to keep me on my toes!', and 'Lucky for you, I have the answer.' "
+        "If unsure about something, admit it with humor and grace."
+    )
+}
+
 search_tool = DuckDuckGoSearchRun()
 
 def get_llm():
@@ -89,29 +123,54 @@ def format_query(query, chat_history, llm):
     
     return llm.invoke(condensed_query).strip()
 
-def retriever_qa(file, query, chat_history, use_search):
+def retriever_qa(file, query, chat_history, use_search, personality):
+
     llm = get_llm()
-    retriever_obj = retriever(file)
-    qa = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever_obj,
-        return_source_documents=False
-    )
+
+    personality_Tunning_Prompt = Personality_Prompts.get(personality, Personality_Prompts["Formal Girl"])
 
     condensed_query = format_query(query, chat_history, llm)
 
-    response = qa.invoke(condensed_query)
 
-    if isinstance(response, dict):
-        answer =  (
-            response.get("result")
-            or response.get("output")
-            or response.get("answer")
-            or str(response)
+    if file:
+
+        retriever_obj = retriever(file)
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", personality_Tunning_Prompt),
+            ("human", "Context: {context}\n\nQuestion: {question}")
+        ])
+
+        qa = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=retriever_obj,
+            return_source_documents=False,
+            chain_type_kwargs={"prompt": prompt}
         )
+
+        response = qa.invoke({"query": condensed_query})
+
+        if isinstance(response, dict):
+            answer = (
+                response.get("result")
+                or response.get("output")
+                or response.get("answer")
+                or str(response)
+            )
+        else:
+            answer = str(response)
+
     else:
-        answer = str(response)
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", personality_Tunning_Prompt),
+            ("human", f"{input}")
+        ])
+
+        chain = prompt | llm
+        answer = chain.invoke({"input": condensed_query})
+        if hasattr(answer, "content"):
+            answer = answer.content
 
     if use_search:
         search_result = search_tool.run(condensed_query)
@@ -129,17 +188,24 @@ def retriever_qa(file, query, chat_history, use_search):
 
 with gr.Blocks() as rag_application:
     gr.Markdown("#RAG QA BOT")
+
     chatbot = gr.Chatbot(label="Chat History")
+
+    personality = gr.Dropdown(choices=["Formal Girl", "Friendly Girl", "Flirtatious Girl"], value="Formal Girl", label="Select Personality")
+
     file_input = gr.File(label="Upload PDF File", file_count="single", file_types=['.pdf'], type="filepath")
+
     query_input = gr.Textbox(label="Input Query", lines=2, placeholder="Type here...")
+
     use_search_checkbox = gr.Checkbox(label="Use Search Tool", value=False)
+
     submit_button = gr.Button("Submit")
     clear_btn = gr.Button("Clear")
     
 
     submit_button.click(
         fn=retriever_qa,
-        inputs=[file_input, query_input, chatbot, use_search_checkbox],
+        inputs=[file_input, query_input, chatbot, use_search_checkbox, personality],
         outputs=[query_input, chatbot]
     )
 
