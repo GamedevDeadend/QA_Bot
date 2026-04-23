@@ -53,14 +53,15 @@ search_tool = DuckDuckGoSearchRun()
 
 def get_llm():
     model_id = "qwen2.5:3b"
-
     llm =  OllamaLLM(model=model_id, temperature=0.7, max_tokens=2048)
     return llm
+
 
 def document_loader(file):
     loader = PyMuPDFLoader(file)
     loaded_document = loader.load()
     return loaded_document
+
 
 def text_splitter(data):
     splitter = RecursiveCharacterTextSplitter(
@@ -71,23 +72,25 @@ def text_splitter(data):
     chunks = splitter.split_documents(data)
     return chunks
 
+
 def embeddings():
     embedding = OllamaEmbeddings(
         model="nomic-embed-text"
     )
     return embedding
 
+
 def vector_database(chunks):
     embedding_model = embeddings()
     vectordb = Chroma.from_documents(chunks, embedding_model)
     return vectordb
+
 
 def retriever(file):
 
     if file in retriever_cache:
         return retriever_cache[file]
     
-
     splits = document_loader(file)
     chunks = text_splitter(splits)
     vectordb = vector_database(chunks)
@@ -95,9 +98,24 @@ def retriever(file):
 
     return retriever_cache[file]
 
+
 def format_query(query, chat_history, llm):
     if not chat_history:
         return query
+    
+    conversation = fetch_convo(chat_history)
+
+    condensed_query = f"""Given the chat history and follow up question, \
+    rephrase the follow up question to be a standalone question.
+    Chat History:
+    {conversation}
+    Follow Up Question: {query}
+    Standalone Question:"""
+    
+    return llm.invoke(condensed_query).strip()
+
+
+def fetch_convo(chat_history):
 
     conversation =  ""
     for message in chat_history:
@@ -113,15 +131,79 @@ def format_query(query, chat_history, llm):
             conversation += f"Human: {content}\n"
         elif role == "assistant":
             conversation += f"AI: {content}\n"
+    return conversation
 
-    condensed_query = f"""Given the chat history and follow up question, \
-    rephrase the follow up question to be a standalone question.
-    Chat History:
-    {conversation}
-    Follow Up Question: {query}
-    Standalone Question:"""
-    
-    return llm.invoke(condensed_query).strip()
+
+def refine_using_search(use_search, llm, personality_Tunning_Prompt, condensed_query, answer):
+    if use_search:
+        search_result = search_tool.run(condensed_query)
+
+        refine_prompt = f"""{personality_Tunning_Prompt}
+You are given an answer and additional web information.
+Original Answer:
+{answer}
+Web Information:
+{search_result}
+Task:
+- Improve the answer using the web information if relevant
+- Keep it concise and original in tone based on the selected personality
+- Do NOT mention "web information" explicitly
+- If web info is irrelevant, ignore it
+Final Answer:
+"""
+
+        refined = llm.invoke(refine_prompt)
+
+        if hasattr(refined, "content"):
+            answer = refined.content.strip()
+        else:
+            answer = str(refined).strip()
+    return answer
+
+
+def GetLLMAnswer(llm, personality_Tunning_Prompt, condensed_query):
+    prompt = ChatPromptTemplate.from_messages([
+            ("system", personality_Tunning_Prompt),
+            ("human", "{input}")
+        ])
+
+    chain = prompt | llm
+    answer = chain.invoke({"input": condensed_query})
+    if hasattr(answer, "content"):
+        answer = answer.content
+    return answer
+
+
+def retrieve_information(file, llm, personality_Tunning_Prompt, condensed_query):
+    retriever_obj = retriever(file)
+
+    prompt = ChatPromptTemplate.from_messages([
+            ("system", personality_Tunning_Prompt),
+            ("human", "Context: {context}\n\nQuestion: {question}")
+        ])
+
+    qa = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=retriever_obj,
+            return_source_documents=False,
+            chain_type_kwargs={"prompt": prompt}
+        )
+
+    response = qa.invoke({"query": condensed_query})
+
+    if isinstance(response, dict):
+        answer = (
+                response.get("result")
+                or response.get("output")
+                or response.get("answer")
+                or str(response)
+            )
+    else:
+        answer = str(response)
+
+    return answer.strip()
+
 
 def retriever_qa(file, query, chat_history, use_search, personality):
 
@@ -133,74 +215,13 @@ def retriever_qa(file, query, chat_history, use_search, personality):
 
 
     if file:
-
-        retriever_obj = retriever(file)
-
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", personality_Tunning_Prompt),
-            ("human", "Context: {context}\n\nQuestion: {question}")
-        ])
-
-        qa = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=retriever_obj,
-            return_source_documents=False,
-            chain_type_kwargs={"prompt": prompt}
-        )
-
-        response = qa.invoke({"query": condensed_query})
-
-        if isinstance(response, dict):
-            answer = (
-                response.get("result")
-                or response.get("output")
-                or response.get("answer")
-                or str(response)
-            )
-        else:
-            answer = str(response)
+        answer = retrieve_information(file, llm, personality_Tunning_Prompt, condensed_query)
 
     else:
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", personality_Tunning_Prompt),
-            ("human", "{input}")
-        ])
-
-        chain = prompt | llm
-        answer = chain.invoke({"input": condensed_query})
-        if hasattr(answer, "content"):
-            answer = answer.content
+        answer = GetLLMAnswer(llm, personality_Tunning_Prompt, condensed_query)
     
 
-    if use_search:
-        search_result = search_tool.run(condensed_query)
-
-        refine_prompt = f"""{personality_Tunning_Prompt}
-
-You are given an answer and additional web information.
-
-Original Answer:
-{answer}
-
-Web Information:
-{search_result}
-
-Task:
-- Improve the answer using the web information if relevant
-- Keep it concise and original in tone based on the selected personality
-- Do NOT mention "web information" explicitly
-- If web info is irrelevant, ignore it
-
-Final Answer:
-"""
-
-        refined = llm.invoke(refine_prompt)
-
-        if hasattr(refined, "content"):
-            answer = refined.content.strip()
-        else:
-            answer = str(refined).strip()
+    answer = refine_using_search(use_search, llm, personality_Tunning_Prompt, condensed_query, answer)
 
     
     chat_history.append({"role": "user", "content": query})
@@ -209,34 +230,42 @@ Final Answer:
     return "", chat_history
 
 
+def builld_ui_application():
+    with gr.Blocks() as rag_application:
+        gr.Markdown("#RAG QA BOT")
 
+        chatbot = gr.Chatbot(label="Chat History")
 
-with gr.Blocks() as rag_application:
-    gr.Markdown("#RAG QA BOT")
+        personality = gr.Dropdown(choices=["Formal Girl", "Friendly Girl", "Flirtatious Girl"], value="Formal Girl", label="Select Personality")
 
-    chatbot = gr.Chatbot(label="Chat History")
+        file_input = gr.File(label="Upload PDF File", file_count="single", file_types=['.pdf'], type="filepath")
 
-        personality = gr.Dropdown(choices=["Formal", "Friendly", "Flirtatious"], value="Formal Girl", label="Select Personality")
+        query_input = gr.Textbox(label="Input Query", lines=2, placeholder="Type here...")
 
-    file_input = gr.File(label="Upload PDF File", file_count="single", file_types=['.pdf'], type="filepath")
+        use_search_checkbox = gr.Checkbox(label="Use Search Tool", value=False)
 
-    query_input = gr.Textbox(label="Input Query", lines=2, placeholder="Type here...")
-
-    use_search_checkbox = gr.Checkbox(label="Use Search Tool", value=False)
-
-    submit_button = gr.Button("Submit")
-    clear_btn = gr.Button("Clear")
+        submit_button = gr.Button("Submit")
+        clear_btn = gr.Button("Clear")
     
 
-    submit_button.click(
-        fn=retriever_qa,
-        inputs=[file_input, query_input, chatbot, use_search_checkbox, personality],
-        outputs=[query_input, chatbot]
+        submit_button.click(
+            fn=retriever_qa,
+            inputs=[file_input, query_input, chatbot, use_search_checkbox, personality],
+            outputs=[query_input, chatbot]
     )
 
-    clear_btn.click(
-        fn=lambda: ([], ""),
-        outputs=[chatbot, query_input]
+        clear_btn.click(
+            fn=lambda: ([], ""),
+            outputs=[chatbot, query_input]
     )
+    
+    return rag_application
 
-rag_application.launch(server_name="127.0.0.1", server_port=7860, share=True)
+
+def launch_rag_application():
+    rag_application = builld_ui_application()
+    rag_application.launch(server_name="127.0.0.1", server_port=7860, share=True)
+
+
+if __name__ == "__main__":
+    launch_rag_application()
