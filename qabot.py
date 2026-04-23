@@ -216,7 +216,7 @@ with gr.Blocks() as rag_application:
 
     chatbot = gr.Chatbot(label="Chat History")
 
-    personality = gr.Dropdown(choices=["Formal Girl", "Friendly Girl", "Flirtatious Girl"], value="Formal Girl", label="Select Personality")
+        personality = gr.Dropdown(choices=["Formal", "Friendly", "Flirtatious"], value="Formal Girl", label="Select Personality")
 
     file_input = gr.File(label="Upload PDF File", file_count="single", file_types=['.pdf'], type="filepath")
 
