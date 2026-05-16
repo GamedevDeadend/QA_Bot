@@ -149,6 +149,7 @@ This project uses **RAG (Retrieval-Augmented Generation)** — a technique where
 6. **Condense** — Rewrite follow-up questions to be self-contained (handles "what about that?" correctly)
 7. **Generate** — Feed retrieved context + personality prompt to Qwen 2.5 3B
 8. **Web Search** — Optionally trigger DuckDuckGo search via the UI toggle to supplement answers with live web results
+9. **Streaming** - Streaming enabled, instead of showing blank screen and wait for whole response to generate bot responses are streamed for better UX
 
 The bot answers from **your document**, not from general knowledge.
 
@@ -175,7 +176,7 @@ QA_Bot/
 - [ ] **Multi-PDF support** — chat across multiple documents simultaneously
 - [ ] **Persistent ChromaDB** — save and reload vector stores between sessions
 - [ ] **Cloud LLM option** — toggle between Ollama (local) and OpenAI/Groq (cloud)
-- [ ] **Streaming responses** — token-by-token output for faster perceived speed
+- [Implemented] **Streaming responses** — token-by-token output for faster perceived speed
 - [ ] **Source citations** — show which PDF page each answer came from
 - [ ] **Docker deployment** — containerized setup for one-command install
 

@@ -1,3 +1,5 @@
+from functools import partial
+
 from langchain_ollama import OllamaLLM
 from langchain_ollama import OllamaEmbeddings
 from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
@@ -6,6 +8,11 @@ from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_classic.chains import RetrievalQA
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_classic.chains import create_retrieval_chain
+from langchain_classic.chains.combine_documents import (
+    create_stuff_documents_chain,
+)
 
 import gradio as gr
 
@@ -49,12 +56,14 @@ Personality_Prompts = {
     )
 }
 
-search_tool = DuckDuckGoSearchRun()
+model_id = "qwen2.5:3b"
+llm =  OllamaLLM(model=model_id, temperature=0.7, max_tokens=2048, streaming=True)
 
-def get_llm():
-    model_id = "qwen2.5:3b"
-    llm =  OllamaLLM(model=model_id, temperature=0.7, max_tokens=2048)
-    return llm
+embedding = OllamaEmbeddings(
+        model="nomic-embed-text"
+    )
+
+search_tool = DuckDuckGoSearchRun()
 
 
 def document_loader(file):
@@ -72,17 +81,8 @@ def text_splitter(data):
     chunks = splitter.split_documents(data)
     return chunks
 
-
-def embeddings():
-    embedding = OllamaEmbeddings(
-        model="nomic-embed-text"
-    )
-    return embedding
-
-
 def vector_database(chunks):
-    embedding_model = embeddings()
-    vectordb = Chroma.from_documents(chunks, embedding_model)
+    vectordb = Chroma.from_documents(chunks, embedding)
     return vectordb
 
 
@@ -149,29 +149,31 @@ Task:
 - Keep it concise and original in tone based on the selected personality
 - Do NOT mention "web information" explicitly
 - If web info is irrelevant, ignore it
+- If the there is contrradiction or halluciantion in the original answer, prioritize the web info
 Final Answer:
 """
+    search_chain  = llm | StrOutputParser()
+    refined = ""
 
-        refined = llm.invoke(refine_prompt)
-
-        if hasattr(refined, "content"):
-            answer = refined.content.strip()
-        else:
-            answer = str(refined).strip()
-    return answer
+    for chunk in search_chain.stream(refine_prompt):
+        refined += chunk
+        yield refined
 
 
-def GetLLMAnswer(llm, personality_Tunning_Prompt, condensed_query):
+
+def GetLLMAnswer(personality_Tunning_Prompt, condensed_query):
     prompt = ChatPromptTemplate.from_messages([
             ("system", personality_Tunning_Prompt),
             ("human", "{input}")
         ])
 
-    chain = prompt | llm
-    answer = chain.invoke({"input": condensed_query})
-    if hasattr(answer, "content"):
-        answer = answer.content
-    return answer
+    chain = prompt | llm | StrOutputParser()
+
+    answer = ""
+
+    for chunks in chain.stream({"input": condensed_query}):
+        answer += chunks
+        yield answer
 
 
 def retrieve_information(file, llm, personality_Tunning_Prompt, condensed_query):
@@ -179,59 +181,65 @@ def retrieve_information(file, llm, personality_Tunning_Prompt, condensed_query)
 
     prompt = ChatPromptTemplate.from_messages([
             ("system", personality_Tunning_Prompt),
-            ("human", "Context: {context}\n\nQuestion: {question}")
+            ("human", "Context: {context}\n\nQuestion: {input}")
         ])
+    
+    question_answering_chain = create_stuff_documents_chain(llm, prompt)
+    retriever_chain = create_retrieval_chain(retriever_obj, question_answering_chain)
 
-    qa = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=retriever_obj,
-            return_source_documents=False,
-            chain_type_kwargs={"prompt": prompt}
-        )
+    response = ""
 
-    response = qa.invoke({"query": condensed_query})
-
-    if isinstance(response, dict):
-        answer = (
-                response.get("result")
-                or response.get("output")
-                or response.get("answer")
-                or str(response)
-            )
-    else:
-        answer = str(response)
-
-    return answer.strip()
+    for chunk in retriever_chain.stream({"input": condensed_query}):
+        if "answer" in chunk:
+            response += chunk["answer"]
+            yield response
 
 
 def retriever_qa(file, query, chat_history, use_search, personality):
-
-    llm = get_llm()
 
     personality_Tunning_Prompt = Personality_Prompts.get(personality, Personality_Prompts["Formal"])
 
     condensed_query = format_query(query, chat_history, llm)
 
+    chat_history = chat_history + [
+            {"role": "user", "content": query},
+            {"role": "assistant", "content": ""}  # ← this is what [-1] points to
+        ]
+    
+    final_answer = ""
+
 
     if file:
-        answer = retrieve_information(file, llm, personality_Tunning_Prompt, condensed_query)
+
+        for rag_partial in retrieve_information(file, llm, personality_Tunning_Prompt, condensed_query):
+            final_answer = rag_partial
+            chat_history[-1]["content"] = final_answer
+            yield "", chat_history
 
     else:
-        answer = GetLLMAnswer(llm, personality_Tunning_Prompt, condensed_query)
+
+        for partial_answer in GetLLMAnswer(personality_Tunning_Prompt, condensed_query):
+            final_answer = partial_answer
+            chat_history[-1]["content"] = final_answer
+            yield "", chat_history     
     
 
-    answer = refine_using_search(use_search, llm, personality_Tunning_Prompt, condensed_query, answer)
+    if use_search:
 
-    
-    chat_history.append({"role": "user", "content": query})
-    chat_history.append({"role": "assistant", "content": answer})
+        chat_history[-1]["content"] = ""
+        chat_history[-1]["content"] = "\n(Refining answer using web search...)\n\n"
+        yield "", chat_history
 
-    return "", chat_history
+        for partial_answer in refine_using_search(use_search, llm, personality_Tunning_Prompt, condensed_query, final_answer):
+            final_answer = partial_answer
+            chat_history[-1]["content"] = final_answer
+            yield "", chat_history
 
 
 def builld_ui_application():
-    with gr.Blocks() as rag_application:
+
+    with gr.Blocks(theme = gr.Theme.from_hub("hmb/super-mario")) as rag_application:
+
         gr.Markdown("#RAG QA BOT")
 
         chatbot = gr.Chatbot(label="Chat History")
