@@ -238,7 +238,11 @@ def retriever_qa(file, query, chat_history, use_search, personality):
 
 def builld_ui_application():
 
-    with gr.Blocks(theme = gr.Theme.from_hub("hmb/super-mario")) as rag_application:
+    theme = gr.Theme.from_hub("hmb/super-mario").set(
+            input_background_fill_focus="#3C3C3C",
+    )
+
+    with gr.Blocks(theme = theme) as rag_application:
 
         gr.Markdown("#RAG QA BOT")
 
